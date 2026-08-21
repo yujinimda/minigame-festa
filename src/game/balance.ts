@@ -12,7 +12,7 @@ export const DRIFT_GRACE_MS = 700;
 export const MIN_TAP_INTERVAL_MS = 60;
 export const STATE_SEND_HZ = 10;
 export const MAX_PLAYERS = 15;
-export const MIN_PLAYERS = 2; // FR-006 시작 최소 인원
+export const MIN_PLAYERS = 1; // FR-006 시작 최소 인원 (2026-08-21: 2→1, 혼자 연습 주행 허용)
 export const COUNTDOWN_MS = 3_000;
 
 export const HEARTBEAT_INTERVAL_MS = 2_000;

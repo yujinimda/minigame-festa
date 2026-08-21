@@ -4,6 +4,7 @@
 
 import Peer, { type DataConnection } from "peerjs";
 import { logDebug } from "@/src/debug/metrics";
+import { PEER_OPTIONS } from "@/src/p2p/ice";
 import {
   BUFFERED_AMOUNT_LIMIT,
   CONNECT_TIMEOUT_MS,
@@ -353,7 +354,7 @@ export const createPlayerClient = (
     const isStale = (): boolean => destroyed || gen !== generation;
 
     peer?.destroy(); // 이전 세대 정리 — 여기서 발화하는 close/error는 gen 가드로 무시됨
-    peer = new Peer();
+    peer = new Peer(PEER_OPTIONS);
 
     clearConnectTimeout();
     connectTimeout = setTimeout(() => {

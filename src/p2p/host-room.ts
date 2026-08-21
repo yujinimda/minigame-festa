@@ -5,6 +5,7 @@
 
 import Peer, { type DataConnection } from "peerjs";
 import { logDebug } from "@/src/debug/metrics";
+import { PEER_OPTIONS } from "@/src/p2p/ice";
 import {
   COUNTDOWN_MS,
   HEARTBEAT_TIMEOUT_MS,
@@ -390,6 +391,7 @@ export const createHostRoom = (options: TCreateHostRoomOptions): THostRoomHandle
   const connections = new Map<string, DataConnection>(); // control 채널
   const pendingCloses = new Set<ReturnType<typeof setTimeout>>(); // 거부 conn 지연 close
   let destroyed = false;
+  let opened = false;
   let peer: Peer | null = null;
   let roomId = generateRoomId();
 
@@ -479,8 +481,22 @@ export const createHostRoom = (options: TCreateHostRoomOptions): THostRoomHandle
 
   const open = (): void => {
     if (destroyed) return;
-    peer = new Peer(roomId);
-    peer.on("open", () => options.onReady(roomId));
+    peer = new Peer(roomId, PEER_OPTIONS);
+    // 시그널링 무한 대기 방지 — 회사망 등 WebSocket 차단 환경에서 원인 안내(필드 피드백)
+    const openTimeout = setTimeout(() => {
+      if (!destroyed && !opened) {
+        options.onError(
+          new Error(
+            "시그널링 서버에 연결하지 못했어요. 네트워크가 WebSocket을 차단하는지 확인하거나(회사망 등) 다른 네트워크에서 새로고침해 주세요",
+          ),
+        );
+      }
+    }, 15_000);
+    peer.on("open", () => {
+      opened = true;
+      clearTimeout(openTimeout);
+      options.onReady(roomId);
+    });
     peer.on("connection", bindConnection);
     // 시그널링 단절 시 재연결 — 기존 DataConnection은 유지되지만
     // 재연결 없이는 신규 참가자가 영구히 못 들어온다(PeerJS Cloud 리스크, R1)
