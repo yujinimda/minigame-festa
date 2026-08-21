@@ -100,10 +100,10 @@ Opus 4.6 독립 에이전트가 수행한다(2026-08-21 프로세스 변경 — 
 
 ## Phase 6: Polish & Cross-Cutting — 통합(코디네이터 워크트리)
 
-- [ ] T028 (test-writer) E2E 스모크 `tests/e2e/party.spec.ts` — 데스크톱(호스트)+모바일 뷰포트 2명: 입장→시작→탭→결과→다시 하기 (실 PeerJS 연결)
-- [ ] T029 quickstart.md 전 시나리오 수동 검증 + lint/build/test 전체 통과 확인
-- [ ] T030 [P] 룩앤필 패스: 아기자기 파티 톤(펭귄·빙판 팔레트), 호스트 대화면 가독성, 폰 세로 최적화 — 기존 컴포넌트 스타일만 수정(파일 소유권은 이 시점부터 통합 워크트리로 이관)
-- [ ] T031 계측 모드 구현(`?debug=1` — 탭/수신/rAF 렌더 타임스탬프 로깅 + heartbeat RTT 시계 보정, quickstart SC-002 절차의 전제) 후 Vercel 프리뷰 배포 + 실기기 체크리스트(quickstart §실기기) 수행
+- [x] T028 (test-writer) E2E 스모크 `tests/e2e/party.spec.ts` — 데스크톱(호스트)+모바일 뷰포트 2명: 입장→시작→탭→결과→다시 하기 (실 PeerJS 연결)
+- [x] T029 quickstart.md 전 시나리오 수동 검증 + lint/build/test 전체 통과 확인
+- [x] T030 [P] 룩앤필 패스: 아기자기 파티 톤(펭귄·빙판 팔레트), 호스트 대화면 가독성, 폰 세로 최적화 — 기존 컴포넌트 스타일만 수정(파일 소유권은 이 시점부터 통합 워크트리로 이관)
+- [x] T031 계측 모드 구현(`?debug=1` — 탭/수신/rAF 렌더 타임스탬프 로깅 + heartbeat RTT 시계 보정, quickstart SC-002 절차의 전제) 후 Vercel 프리뷰 배포 + 실기기 체크리스트(quickstart §실기기) 수행
 - [ ] T032 플레이테스트 게이트(quickstart §플레이테스트 — SC-001~005, 15인 go/no-go) 실행, 실패 항목은 research R1 결정지로 루프백
 
 ## Dependencies & Execution Order
