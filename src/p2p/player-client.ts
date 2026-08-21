@@ -74,9 +74,26 @@ export const createPlayerCore = (options: TPlayerCoreOptions): TPlayerCore => {
   let lastDistance = 0;
   let lastDistanceReachedAt: number | null = null;
 
+  // reconnecting에서 복귀할 때는 레이스 진행 상황에 맞는 상태로 돌아간다(게이트8 B6) —
+  // 무조건 joined로 내리면 남은 레이스 동안 state/finish 송신이 영구 중단된다
   const markHostSeen = (): void => {
     lastHostSeenAt = now();
-    if (status === "reconnecting") status = "joined";
+    if (status !== "reconnecting") return;
+    if (raceStartReceivedAt !== null && !finishSent && !fallSent) {
+      const elapsed = now() - raceStartReceivedAt;
+      status =
+        elapsed < countdownMs
+          ? "countdown"
+          : elapsed < countdownMs + durationMs
+            ? "racing"
+            : "finished";
+    } else if (finishSent || fallSent) {
+      status = results !== null ? "result" : "finished";
+    } else if (results !== null) {
+      status = "result";
+    } else {
+      status = "joined";
+    }
   };
 
   return {
@@ -91,10 +108,16 @@ export const createPlayerCore = (options: TPlayerCoreOptions): TPlayerCore => {
             results = msg.snapshot.results;
             status = "result";
           } else if (msg.snapshot.phase === "race" || msg.snapshot.phase === "countdown") {
-            // 재접속 복원: 남은 시간 기준으로 로컬 타이머 재구성
+            // 재접속 복원: remainingMs = 전체 잔여(카운트다운 포함, 계약 §RoomSnapshot)로 역산
             const remaining = msg.snapshot.remainingMs ?? 0;
-            raceStartReceivedAt = now() - (COUNTDOWN_MS + durationMs - remaining);
-            status = msg.snapshot.ownRecord ? "finished" : msg.snapshot.phase === "race" ? "racing" : "countdown";
+            raceStartReceivedAt = now() - (countdownMs + durationMs - remaining);
+            if (msg.snapshot.ownRecord) {
+              // 이미 확정된 기록 승계 — 로컬 타이머 만료 시 finish 중복 송신 방지
+              finishSent = true;
+              status = "finished";
+            } else {
+              status = msg.snapshot.phase === "race" ? "racing" : "countdown";
+            }
           } else {
             status = "joined";
           }
@@ -112,6 +135,7 @@ export const createPlayerCore = (options: TPlayerCoreOptions): TPlayerCore => {
           fallSent = false;
           lastDistance = 0;
           lastDistanceReachedAt = null;
+          results = null; // 이전 판 순위가 새 판 화면에 남지 않게
           status = "countdown";
           return;
         case "race-end":
@@ -256,34 +280,74 @@ export const createPlayerClient = (
   let latest: TStatePayload | null = null;
   let reconnectAttempt = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let connectTimeout: ReturnType<typeof setTimeout> | null = null;
+  // 연결 세대 토큰(게이트8 B2) — connect()가 다시 돌면 이전 세대의
+  // close/error/timeout 콜백은 전부 무시된다(destroy 연쇄로 인한 재스케줄 폭주 방지)
+  let generation = 0;
 
   const core = createPlayerCore({
     now: () => Date.now(),
-    send: (msg) => control?.send(msg),
+    send: (msg) => {
+      if (control?.open) control.send(msg);
+    },
   });
 
+  // 변경 감지 알림(게이트8 B9와 동일 원리) — status/roster/results가 바뀐 때만 스토어 갱신
+  let lastSignature = "";
+  const notifyIfChanged = (): void => {
+    const results = core.getResults();
+    const signature = [
+      core.getStatus(),
+      core.getNickname() ?? "-",
+      core
+        .getRoster()
+        .map((r) => `${r.playerId}:${r.connected}`)
+        .join(","),
+      results ? results.map((r) => `${r.playerId}:${r.rank}`).join(",") : "-",
+    ].join("|");
+    if (signature !== lastSignature) {
+      lastSignature = signature;
+      options.onChange();
+    }
+  };
+
+  // 재접속은 단일 pending 타이머로만(게이트8 B2) — 이미 예약돼 있으면 무시해 백오프 수열 유지
   const scheduleReconnect = (): void => {
-    if (destroyed || core.getStatus() === "closed") return;
+    if (destroyed || core.getStatus() === "closed" || reconnectTimer) return;
     reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
       reconnectAttempt += 1;
       connect();
     }, nextReconnectDelay(reconnectAttempt));
   };
 
+  const clearConnectTimeout = (): void => {
+    if (connectTimeout) {
+      clearTimeout(connectTimeout);
+      connectTimeout = null;
+    }
+  };
+
   const connect = (): void => {
     if (destroyed) return;
-    peer?.destroy();
+    generation += 1;
+    const gen = generation;
+    const isStale = (): boolean => destroyed || gen !== generation;
+
+    peer?.destroy(); // 이전 세대 정리 — 여기서 발화하는 close/error는 gen 가드로 무시됨
     peer = new Peer();
-    const timeout = setTimeout(() => {
-      if (!control?.open) {
-        peer?.destroy();
-        if (reconnectAttempt === 0) options.onConnectFailed();
-        else scheduleReconnect();
-      }
+
+    clearConnectTimeout();
+    connectTimeout = setTimeout(() => {
+      connectTimeout = null;
+      if (isStale() || control?.open) return; // 새 세대가 시작됐거나 이미 연결됨(게이트8 B3)
+      peer?.destroy();
+      if (reconnectAttempt === 0) options.onConnectFailed();
+      else scheduleReconnect();
     }, CONNECT_TIMEOUT_MS);
 
     peer.on("open", () => {
-      if (!peer || destroyed) return;
+      if (isStale() || !peer) return;
       control = peer.connect(options.roomId, {
         reliable: true,
         serialization: "json",
@@ -295,7 +359,8 @@ export const createPlayerClient = (
         metadata: { playerId: options.playerId, channel: "state" },
       });
       control.on("open", () => {
-        clearTimeout(timeout);
+        if (isStale()) return;
+        clearConnectTimeout();
         reconnectAttempt = 0;
         control?.send({
           v: PROTOCOL_VERSION,
@@ -305,34 +370,40 @@ export const createPlayerClient = (
         });
       });
       control.on("data", (raw) => {
+        if (isStale()) return;
         const msg = parseMessage(raw);
         if (!msg) return;
-        if (msg.type === "join-rejected") options.onRejected(msg.reason);
+        if (msg.type === "join-rejected") {
+          options.onRejected(msg.reason);
+          destroy(); // 거부된 세션은 하트비트를 계속 보내지 않는다 — 재시도는 새 클라이언트로
+          return;
+        }
         core.handleHostMsg(msg as THostMsg);
-        options.onChange();
+        notifyIfChanged();
       });
       control.on("close", () => {
-        if (!destroyed) scheduleReconnect();
+        if (!isStale()) scheduleReconnect();
       });
       control.on("error", () => {
-        if (!destroyed) scheduleReconnect();
+        if (!isStale()) scheduleReconnect();
       });
     });
     peer.on("error", () => {
-      clearTimeout(timeout);
-      if (!destroyed) {
-        if (reconnectAttempt === 0) options.onConnectFailed();
-        else scheduleReconnect();
-      }
+      if (isStale()) return;
+      clearConnectTimeout();
+      if (reconnectAttempt === 0) options.onConnectFailed();
+      else scheduleReconnect();
     });
   };
 
   connect();
 
   const heartbeatTimer = setInterval(() => {
-    control?.send({ v: PROTOCOL_VERSION, type: "heartbeat", t: Date.now() });
+    if (control?.open) {
+      control.send({ v: PROTOCOL_VERSION, type: "heartbeat", t: Date.now() });
+    }
     core.tick();
-    options.onChange();
+    notifyIfChanged();
   }, HEARTBEAT_INTERVAL_MS);
 
   const stateTimer = setInterval(() => {
@@ -361,8 +432,24 @@ export const createPlayerClient = (
 
   const tickTimer = setInterval(() => {
     core.tick();
-    options.onChange();
+    notifyIfChanged();
   }, 100);
+
+  const destroy = (): void => {
+    if (destroyed) return;
+    destroyed = true;
+    clearInterval(heartbeatTimer);
+    clearInterval(stateTimer);
+    clearInterval(tickTimer);
+    clearConnectTimeout();
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    control?.close();
+    stateChannel?.close();
+    peer?.destroy();
+  };
 
   return {
     core,
@@ -372,17 +459,8 @@ export const createPlayerClient = (
     reportFall: (payload) => {
       latest = payload;
       core.reportFall(payload.distance, payload.distanceReachedAt);
-      options.onChange();
+      notifyIfChanged();
     },
-    destroy: () => {
-      destroyed = true;
-      clearInterval(heartbeatTimer);
-      clearInterval(stateTimer);
-      clearInterval(tickTimer);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      control?.close();
-      stateChannel?.close();
-      peer?.destroy();
-    },
+    destroy,
   };
 };

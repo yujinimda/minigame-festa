@@ -42,7 +42,9 @@ const PlayScreen = () => {
   return (
     <>
       <MuteBadge />
-      {status === "result" || status === "finished" ? (
+      {/* finished(넘어짐/완주 직후, race-end 전)는 컨트롤러가 유지해 피드백 연출을
+          렌더한다(게이트8 B8) — 개인 결과 화면은 순위가 확정된 result에서만 */}
+      {status === "result" ? (
         <PersonalResultContainer session={session} />
       ) : (
         <PlayControllerContainer session={session} />

@@ -3,7 +3,7 @@
 // 플레이어 세션 수명주기 훅(F 소유) — 접속·스토어 동기화·오디오 언락.
 // 컨테이너는 join()과 반환 핸들만 소비.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { unlockAudio } from "@/src/audio/sound";
 import {
   createPlayerClient,
@@ -53,5 +53,14 @@ export const usePlayerSession = (): TPlayerSession => {
     store.setScreen("game");
   }, []);
 
-  return { client, join };
+  // 언마운트 시 세션 정리(게이트8 B4) — 없으면 유령 하트비트가 호스트 정원을 계속 점유한다
+  useEffect(
+    () => () => {
+      clientRef.current?.destroy();
+      clientRef.current = null;
+    },
+    [],
+  );
+
+  return useMemo(() => ({ client, join }), [client, join]);
 };
