@@ -25,16 +25,14 @@ const RankingBoard = ({ results }: TRankingBoardProps) => {
               : "bg-sky-800 text-white"
           }`}
         >
-          <span className="w-14 shrink-0 text-2xl font-black">
+          <span className="w-24 shrink-0 text-2xl font-black tabular-nums">
             {MEDALS[result.rank] ?? ""} {result.rank}위
           </span>
-          <span className="flex-1 truncate">
-            🐧 {result.nickname}
-            {result.fallen && (
-              <span className="ml-2 text-base font-semibold opacity-80">꽈당 💥</span>
-            )}
-          </span>
-          <span className="shrink-0 font-mono">{result.distance}보</span>
+          <span className="min-w-0 flex-1 truncate">🐧 {result.nickname}</span>
+          {result.fallen && (
+            <span className="shrink-0 text-base font-semibold opacity-80">꽈당 💥</span>
+          )}
+          <span className="shrink-0 font-mono tabular-nums">{result.distance}보</span>
         </li>
       ))}
     </ol>
