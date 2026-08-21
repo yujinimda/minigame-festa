@@ -4,6 +4,7 @@
 // 계약 근거: specs/001-penguin-party/contracts/p2p-protocol.md
 
 import Peer, { type DataConnection } from "peerjs";
+import { logDebug } from "@/src/debug/metrics";
 import {
   COUNTDOWN_MS,
   HEARTBEAT_TIMEOUT_MS,
@@ -434,6 +435,9 @@ export const createHostRoom = (options: TCreateHostRoomOptions): THostRoomHandle
     conn.on("data", (raw) => {
       const msg = parseMessage(raw);
       if (!msg) return;
+      if (msg.type === "state") {
+        logDebug("state-recv", { playerId, seq: msg.seq, distance: msg.distance });
+      }
       if (msg.type === "join") {
         // 연결 세대: 같은 playerId의 새 control 연결이 오면 교체 후 이전 연결을 닫는다.
         // 순서 중요 — peerjs의 close()는 동기 emit이라 set을 먼저 해야

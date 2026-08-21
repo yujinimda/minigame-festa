@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import Controller from "@/src/components/play/Controller";
 import TiltGauge from "@/src/components/play/TiltGauge";
 import { playSfx, vibrate } from "@/src/audio/sound";
+import { logDebug } from "@/src/debug/metrics";
 import type { TPlayerSession } from "@/src/components/shared/usePlayerSession";
 import { applyDrift, applyTap, createRaceState, type TPenguinRaceState } from "@/src/game/penguin";
 import type { TPlayerStatus, TPlayerClientHandle } from "@/src/p2p/player-client";
@@ -84,6 +85,7 @@ const RaceRunner = ({
     if (status !== "racing" || stateRef.current.fallen) return;
     const next = applyTap(stateRef.current, side, raceNow());
     if (next === stateRef.current) return; // 연타 무시(MIN_TAP_INTERVAL)
+    logDebug("tap", { side, distance: next.distance }); // 계측 모드(SC-002)
     if (!next.fallen) {
       playSfx("tap");
       vibrate(12);

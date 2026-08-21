@@ -4,6 +4,7 @@
 
 import * as Phaser from "phaser";
 import { playSfx, startBgm, stopBgm } from "@/src/audio/sound";
+import { logDebug } from "@/src/debug/metrics";
 import { TILT_LIMIT } from "@/src/game/balance";
 import type { TRacePosition } from "@/src/p2p/host-room";
 
@@ -122,9 +123,17 @@ class RaceScene extends Phaser.Scene {
     });
   }
 
+  private lastTotalDistance = -1;
+
   update(): void {
     const positions = this.source.getPositions();
     const leader = positions.reduce((max, p) => Math.max(max, p.distance), 0);
+    // 계측 모드: 위치가 실제로 갱신된 프레임만 렌더 스탬프(SC-002 탭→렌더 구간)
+    const total = positions.reduce((sum, p) => sum + p.distance, 0);
+    if (total !== this.lastTotalDistance) {
+      this.lastTotalDistance = total;
+      logDebug("render", { total, leader });
+    }
     const goal = Math.max(MIN_GOAL, leader + 8);
 
     for (const pos of positions) {

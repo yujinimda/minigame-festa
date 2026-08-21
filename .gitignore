@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dev 실행 시 자동 생성되는 에이전트 파일
+/AGENTS.md
+/CLAUDE.md
+/test-results/
+/playwright-report/
