@@ -16,7 +16,8 @@ export interface THostLobbyContainerProps {
 const HostLobbyContainer = ({ room }: THostLobbyContainerProps) => {
   const roomId = useHostStore((s) => s.roomId);
   const roster = useHostStore((s) => s.roster);
-  const canStart = roster.length >= MIN_PLAYERS;
+  // 끊긴 참가자는 시작 인원에서 제외 — 유령만 남은 방에서 빈 레이스가 도는 것 방지
+  const canStart = roster.filter((p) => p.connected).length >= MIN_PLAYERS;
 
   const handleStart = async () => {
     // 호스트 오디오 언락 지점 — 사용자 제스처(FR-024)

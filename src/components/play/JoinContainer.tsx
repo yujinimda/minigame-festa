@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import NicknameForm from "@/src/components/play/NicknameForm";
+import { MAX_PLAYERS, NICKNAME_MAX_LENGTH } from "@/src/game/balance";
 import { loadIdentity } from "@/src/p2p/player-client";
 
 export interface TPlayJoinContainerProps {
@@ -14,7 +15,7 @@ export interface TPlayJoinContainerProps {
 }
 
 const REJECT_MESSAGES: Record<string, string> = {
-  "room-full": "정원이 가득 찼어요 (최대 15명)",
+  "room-full": `정원이 가득 찼어요 (최대 ${MAX_PLAYERS}명)`,
   "race-in-progress": "게임이 진행 중이에요 — 다음 판을 기다려주세요",
   "invalid-nickname": "닉네임이 올바르지 않아요 — 다시 입력해주세요",
 };
@@ -25,13 +26,12 @@ const PlayJoinContainer = ({
   connectFailed,
   onJoin,
 }: TPlayJoinContainerProps) => {
-  // loadIdentity는 렌더마다 호출해도 같은 값이지만, 프리필 고정을 위해 최초 1회만
-  const [initialNickname] = useState(() => loadIdentity().nickname ?? "");
-  const [lastNickname, setLastNickname] = useState(initialNickname);
+  // 닉네임 값은 여기가 소유 — 재시도 버튼과 폼이 같은 현재 값을 쓴다
+  const [nickname, setNickname] = useState(() => loadIdentity().nickname ?? "");
 
-  const handleJoin = (nickname: string) => {
-    setLastNickname(nickname);
-    onJoin(nickname);
+  const handleRetry = () => {
+    const value = nickname.trim();
+    if (value) onJoin(value.slice(0, NICKNAME_MAX_LENGTH));
   };
 
   return (
@@ -51,7 +51,7 @@ const PlayJoinContainer = ({
           </p>
           <button
             type="button"
-            onClick={() => lastNickname && onJoin(lastNickname)}
+            onClick={handleRetry}
             className="rounded-xl bg-sky-700 px-6 py-3 font-bold text-white active:scale-95"
           >
             다시 시도
@@ -59,7 +59,12 @@ const PlayJoinContainer = ({
         </div>
       )}
 
-      <NicknameForm initialNickname={initialNickname} onSubmit={handleJoin} />
+      <NicknameForm
+        nickname={nickname}
+        onNicknameChange={setNickname}
+        submitLabel={connectFailed ? "이 닉네임으로 다시 시도" : "입장하기 🐧"}
+        onSubmit={onJoin}
+      />
     </main>
   );
 };
