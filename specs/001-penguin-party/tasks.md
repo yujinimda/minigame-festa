@@ -27,7 +27,8 @@ Opus 4.6 독립 에이전트가 수행한다(2026-08-21 프로세스 변경 — 
 - 페이지 셸은 F가 만든 **컨테이너 스텁을 각 스토리가 자기 파일에서 구현**하는
   방식이라 스토리끼리 같은 파일을 만지지 않는다. 셸 자체는 F 이후 불변.
 - 공유 지점 단일 소유(6번 규칙): F 소유 파일 전체(`src/p2p/*`·`src/game/*`·`src/stores/*`·
-  `src/audio/*`·페이지 셸)는 F 머지 후 **스토리 워크트리에서 수정 금지**. 스토리 작업 중
+  `src/audio/*`·`src/components/shared/*`·페이지 셸·프로젝트 설정)는 F 머지 후
+  **스토리 워크트리에서 수정 금지**. 스토리 작업 중
   계약·로직 변경이 필요해지면 코디네이터에 에스컬레이션(코디네이터가 수정·재머지 판단).
   스토리의 권위 로직 검증은 T009(F 테스트)가 선행 담당 — 스토리 테스트는 자기 소유
   컴포넌트만 다루고 F 모듈은 목킹한다.
@@ -48,8 +49,8 @@ Opus 4.6 독립 에이전트가 수행한다(2026-08-21 프로세스 변경 — 
 - [ ] T007 (test-writer) 게임 판정 단위 테스트 `tests/unit/game/penguin.test.ts` — spec FR-008~012·데이터모델 기준: 교대 전진·회복, 같은쪽 페널티, 드리프트·grace, |tilt|≥100 넘어짐, MIN_TAP_INTERVAL 무시, distanceReachedAt 갱신. **T008보다 먼저 작성, 실패 확인**
 - [ ] T008 판정 순수 로직 `src/game/penguin.ts` — `createRaceState()`, `applyTap(state, side, now)`, `applyDrift(state, dt)` (T007 통과가 완료 조건)
 - [ ] T009 (test-writer) P2P·로스터·수명주기 단위 테스트 — **호스트/플레이어 권위 로직 전부 F에서 선행 검증**(스토리 테스트가 F 모듈을 검증하지 않도록): `tests/unit/p2p/protocol.test.ts`(stale seq/raceId 폐기, 스냅샷 직렬화 왕복), `tests/unit/p2p/host-room.test.ts`(빈 닉네임 거부·15정원(재접속 미산입)·중복 접미사 " (2)"·로비 외 phase 입장 거부·playerId 재접속 승계 — FR-003·004·020·026 / race-start→race-end 집계·끊김 시 마지막 state 확정(FR-019)·동점 3단계 타이브레이크(FR-021)·**return-lobby 브로드캐스트 후 raceId 증가·기록 초기화·멤버 유지(FR-017)**), `tests/unit/p2p/player-client.test.ts`(로컬 타이머·재접속 백오프·하트비트 6s/20s 룰)
-- [ ] T010 호스트 룸 코어 `src/p2p/host-room.ts` — Peer 생성·ID충돌 재발급·control/state 2채널 수락·join/재접속(스냅샷)·**권위 판정: 정원 검사·닉네임 검증/중복 접미사·로비 외 입장 거부**·하트비트 감시·roster·race-start/end 브로드캐스트·순위 집계(동점 규칙)·**return-lobby 브로드캐스트(raceId 증가·기록 초기화·멤버 유지)** (T009 통과가 완료 조건)
-- [ ] T011 플레이어 클라이언트 `src/p2p/player-client.ts` — 접속(10s 타임아웃)·재접속 백오프(1→2→4→10s)·heartbeat/ack·**ack 부재 20s 시 '방이 종료됨' 상태 노출(room-closed 동등 처리)**·state 10Hz 송신·bufferedAmount 가드·localStorage(playerId, nickname) (T009 통과가 완료 조건)
+- [ ] T010 호스트 룸 코어 `src/p2p/host-room.ts` — Peer 생성·ID충돌 재발급·control/state 2채널 수락·join/재접속(스냅샷)·**권위 판정: 정원 검사·닉네임 검증/중복 접미사·로비 외 입장 거부**·하트비트 감시·roster·race-start/end 브로드캐스트·순위 집계(동점 3단계: distance ↓ → distanceReachedAt ↑ → **join 수락 순서 보존으로 최종 유일화**)·**return-lobby 브로드캐스트(raceId 증가·기록 초기화·멤버 유지)** (T009 통과가 완료 조건)
+- [ ] T011 플레이어 클라이언트 `src/p2p/player-client.ts` — 접속(10s 타임아웃)·재접속 백오프(1→2→4→10s)·heartbeat/ack·**ack 부재 20s 시 '방이 종료됨' 상태 노출(room-closed 동등 처리)**·**race-start 수신→로컬 30s 타이머(수신 시점 기준, R4)→만료 시 `finish` 송신·넘어짐 시 `fall` 송신**·**race-end/return-lobby 수신 처리(상태 전이 노출)**·state 10Hz 송신·bufferedAmount 가드·localStorage(playerId, nickname) (T009 통과가 완료 조건)
 - [ ] T012 [P] 상태 스토어 `src/stores/host-store.ts`, `src/stores/player-store.ts` — phase 머신(lobby→countdown→race→result→**lobby(다시 하기 전이)**), roster
 - [ ] T013 [P] 오디오·햅틱 `src/audio/sound.ts` — Web Audio 언락(제스처)·효과음·BGM 훅·vibrate 폴백(iOS 시각 플래시)·음소거 표시 상태
 - [ ] T014 페이지 셸: `app/layout.tsx`(ko, viewport), `app/page.tsx`(랜딩→/host), `app/host/page.tsx`·`app/play/page.tsx`(useSearchParams+Suspense, phase 스위치로 컨테이너 렌더), 컨테이너 스텁 6개 `src/components/{host,play}/*Container.tsx` + 공용 UI `src/components/shared/`(**음소거 아이콘 표시 컴포넌트 포함** — FR-025, '방이 종료됨' 안내 포함)
@@ -79,7 +80,7 @@ Opus 4.6 독립 에이전트가 수행한다(2026-08-21 프로세스 변경 — 
 - [ ] T020 (test-writer) [US2] 컨트롤러 UI 테스트 `tests/unit/us2/controller.test.tsx` — **US2 소유 컴포넌트만 대상, F 모듈은 목킹**(레이스 수명주기는 T009가 F에서 검증 완료): Controller 탭→applyTap 위임·좌우 버튼 렌더·온보딩 카피 카운트다운 중 노출·넘어짐 후 입력 무시 표시, TiltGauge ±100 클램프 표시
 - [ ] T021 [P] [US2] 컨트롤러 `src/components/play/ControllerContainer.tsx` + `Controller.tsx`(좌/우 대형 버튼, 온보딩 카피 "좌우 번갈아 탭!" 카운트다운 중 노출, 탭 피드백 진동/플래시) + `TiltGauge.tsx`(±100 클램프 표시)
 - [ ] T022 [P] [US2] 레이스 뷰 `src/components/host/RaceContainer.tsx`(next/dynamic ssr:false로 Phaser 마운트/언마운트) + `src/game-view/race-scene.ts`(Phaser 3 씬 — 가로 트랙 15레인, 스냅샷 ref 구독 렌더, 기울기 반영 스프라이트, 넘어짐 미끄러짐 트윈+파티클+카메라 쉐이크)
-- [ ] T023 [US2] 레이스 배선: 카운트다운·rAF 게임 루프(applyTap/applyDrift)·10Hz 송신·호스트 수집→트랙 갱신·이중 마감(로컬 30s + 호스트 마감)·사운드 이벤트, T020 통과 확인
+- [ ] T023 [US2] 레이스 배선: 카운트다운 UI·rAF 게임 루프(applyTap/applyDrift 호출)·player-client/host-room **API 소비만**(레이스 수명주기 — 로컬 타이머·finish/fall 송신·호스트 마감 — 는 F의 T010/T011이 구현 완료, 여기선 UI 연결만)·호스트 수집→트랙 갱신·사운드 이벤트, T020 통과 확인
 
 **Checkpoint**: US1+US2 = 플레이 가능한 게임 — 머지 2순위. 단, 30초 종료 후
 "결과 화면"은 US3 머지 전이므로 **스텁 ResultContainer 렌더까지만 검증**
