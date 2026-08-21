@@ -5,34 +5,55 @@
 ## R1. P2P 라이브러리와 방 식별
 
 - **Decision**: peerjs ^1.5 + 공식 클라우드 PeerServer(무료). 호스트가
-  `Peer("mgf-" + 6자리 코드)`로 자기 ID를 방 코드로 삼고, 플레이어는
-  `peer.connect(hostId)`의 DataConnection(reliable·ordered)으로 직접 연결.
-- **Rationale**: 시그널링 서버를 직접 운영하지 않아 비용 0원(FR-018). 15개
-  DataConnection은 호스트 브라우저가 충분히 감당. ID를 곧 방 코드로 쓰면
-  별도 방 레지스트리가 필요 없다. 접두사 `mgf-`로 타 서비스 ID와 충돌 회피.
+  `Peer("mgf-" + 6자리 코드)`로 자기 ID를 방 코드로 삼고, 플레이어는 채널 2개
+  (control: reliable / state: unreliable — 계약 문서 참조)로 직접 연결.
+- **Rationale**: 시그널링 서버를 직접 운영하지 않아 비용 0원(FR-018). ID를 곧
+  방 코드로 쓰면 별도 방 레지스트리가 필요 없다. 접두사 `mgf-`로 타 서비스 ID와
+  충돌 확률을 낮추고, 그래도 충돌하면(`unavailable-id` 에러) 코드를 재발급한다.
+- **알려진 리스크와 대응** (PeerJS Cloud는 공유 인프라):
+  - *ID 충돌*: `unavailable-id` 수신 시 새 코드로 자동 재생성 (구현 필수)
+  - *시그널링 장애/연결 타임아웃*: 플레이어 접속 10초 타임아웃 → 오류 안내 +
+    "다시 시도" 버튼. 호스트도 Peer open 실패 시 재시도 UI
+  - *ICE 실패(symmetric NAT)*: 기본 구성은 STUN만 — 모바일 데이터 일부 환경에서
+    연결 실패 가능. 참가 화면에 "잘 안 되면 호스트와 같은 Wi-Fi로" 안내 문구
+  - *연결 수*: PeerJS FAQ는 peer당 실용 연결 수를 5~10으로 안내. 본 프로젝트는
+    저대역 텍스트만 오가므로 초과 가능성이 높지만 **검증 전 가정** — 구현 후
+    15인 실기기 go/no-go 플레이테스트를 배포 게이트로 둔다(quickstart §플레이테스트).
+    실패 시 결정지: ① 스펙을 "같은 Wi-Fi 권장, 정원 축소"로 완화 ② 셀프호스트
+    PeerServer(무료 티어) 도입 — FR-018(비용 0원)은 두 경우 모두 유지 가능
 - **Alternatives considered**: 원시 WebRTC + 수제 시그널링(무료 서버 필요 — 탈락),
   Colyseus(서버 필요 — 탈락), Supabase Realtime(지연·서버 의존 — 설계 단계에서 기각).
 
 ## R2. Next.js 배포 형태와 라우팅
 
-- **Decision**: 표준 Vercel 배포(무료 Hobby), App Router. `/play/[roomId]`는
-  동적 세그먼트를 그대로 쓰되 페이지 전체를 클라이언트 컴포넌트로 구성.
-  API 라우트·서버 액션·DB는 만들지 않는다.
-- **Rationale**: QR에 담기는 URL이 `/play/abc123` 형태로 깔끔. static export로
-  강제하면 동적 세그먼트 처리가 번거로운데, Vercel Hobby 무료 범위에서 표준
-  배포로도 서버 코드 0인 상태를 유지할 수 있어 FR-018 충족.
-- **Alternatives considered**: `output: 'export'` + `/play?room=` 쿼리(URL이 지저분,
-  득이 없음), GitHub Pages(프리뷰 배포·도메인 편의성에서 Vercel이 우위).
+- **Decision**: Next.js `output: 'export'`(완전 정적 export) + Vercel 무료 배포.
+  참가 경로는 `/play?room={roomId}` 쿼리 방식(클라이언트에서 useSearchParams로
+  파싱, Suspense 경계 포함). API 라우트·서버 액션·DB 없음.
+- **Rationale**: 동적 세그먼트 `[roomId]`는 static export에서 지원되지 않으므로,
+  FR-018의 "정적 호스팅"을 문자 그대로 지키려면 쿼리 방식이 맞다. URL은 QR에
+  담겨 사람이 손으로 치지 않으므로 미관 손실이 실익에 영향 없음(codex B3 반영).
+  정적 export는 배포 대상을 어떤 정적 호스트로도 옮길 수 있게 한다.
+- **Alternatives considered**: 표준 Vercel 배포 + `/play/[roomId]`(서버 코드는
+  없지만 "정적 호스팅" 요구와 어긋남 — 기각), hash 라우팅 `#room=`(쿼리로 충분),
+  Vite SPA(스택 단순화 이점은 있으나 Vercel 프리뷰·기존 숙련도 기준 Next 유지).
 
 ## R3. 상태 전송 주기와 메시지 설계
 
-- **Decision**: 플레이어 → 호스트 상태 스냅샷 10Hz(100ms 간격) + 이벤트(넘어짐·입장·퇴장)는
-  즉시 전송. 호스트는 수신 상태를 보간 없이 최근값 렌더(60fps rAF 루프에서 CSS transform).
-- **Rationale**: SC-002(≤0.5s 반영)에 10Hz + WebRTC 지연(수십 ms)이면 충분한 여유.
-  15명 × 10Hz × 작은 JSON은 대역폭·GC 부담이 무시 가능한 수준. 넘어짐 같은
-  단발 이벤트를 스냅샷에 실으면 유실 시 연출을 놓치므로 별도 이벤트로 분리.
+- **Decision**: 채널 분리 — 제어·이벤트는 reliable control 채널, 상태 스냅샷
+  10Hz는 **unreliable state 채널**(`{reliable: false}`, 재전송 없음)로 전송.
+  스냅샷은 `(raceId, seq)`를 달고, 수신 측은 오래된 seq·다른 raceId를 폐기.
+  state 채널 미개통 시 control로 폴백하되 `bufferedAmount > 16KB`면 그 틱을
+  건너뛴다(중간 스냅샷 합침). 호스트는 최근값을 60fps rAF에서 CSS transform 렌더.
+- **Rationale**: reliable·ordered 단일 채널은 패킷 손실 시 재전송 대기(head-of-line
+  blocking)로 오래된 상태가 밀려 SC-002(0.5s)를 위협한다(codex B5 반영). 상태는
+  최신값만 의미 있으므로 유실 허용이 맞고, 넘어짐 같은 단발 이벤트는 유실되면
+  안 되므로 reliable 채널에 남긴다. `raceId`는 "다시 하기" 후 이전 판 지연
+  메시지 오염 방지(codex B1).
+- **계측**: 15인 플레이테스트에서 입력→호스트 반영 지연 p95를 스냅샷 타임스탬프로
+  측정해 SC-002를 수치로 확인한다(quickstart §플레이테스트).
 - **Alternatives considered**: 탭 원본 전송 + 호스트 판정(FR-013 위배, 지연 민감),
-  30~60Hz 전송(이득 없이 부하만 증가), 보간 렌더(단순 최근값으로 SC-002 충족 — YAGNI).
+  reliable 단일 채널 + 큐 감시만(HOL blocking 잔존 — 기각), 30~60Hz(이득 없음),
+  보간 렌더(최근값으로 충분 — YAGNI).
 
 ## R4. 시간 동기화 (레이스 시작·종료)
 
@@ -53,9 +74,10 @@
   버튼 탭(사용자 제스처)에서 AudioContext를 resume해 모바일 자동재생 제약 해제.
   호스트 BGM은 `<audio loop>` + 게임 시작 버튼 제스처로 시작.
 - **Rationale**: iPhone 13(기준 기기)이 Vibration API를 지원하지 않는 것이 확인된
-  플랫폼 제약 — 스펙의 "진동" 요구는 안드로이드에서 충족, iOS는 폴백으로 대체하고
-  이 예외를 스펙 Assumptions에 반영하지 않고 구현 노트로 남긴다(사용자 보고 시 명시).
-  Web Audio는 지연이 낮아 탭 피드백에 적합.
+  플랫폼 제약. 이 폴백은 스펙 FR-025에 명시적으로 반영했다(codex B6) — "진동은
+  지원 기기에서, 미지원 기기(iOS Safari)는 시각 플래시+효과음 폴백 허용".
+  Web Audio는 지연이 낮아 탭 피드백에 적합. 오디오 언락 성공/실패는 UI에 표시
+  (음소거 아이콘)하고, 실기기 검증 체크리스트를 quickstart에 둔다.
 - **Alternatives considered**: howler.js(의존성 추가 대비 이득 적음), iOS 햅틱을
   위한 네이티브 래퍼(웹 범위 밖 — 기각).
 

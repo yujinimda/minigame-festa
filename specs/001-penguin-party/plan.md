@@ -23,11 +23,11 @@ PeerJS(WebRTC) 방을 열어 서버 역할을 하고, 플레이어 폰은 좌/�
 
 **Target Platform**: 플레이어 — iOS Safari(기준 iPhone 13)·Android Chrome 최근 2년, 세로 모드 / 호스트 — 데스크톱 Chrome
 
-**Project Type**: 웹 앱(단일 Next.js 프로젝트, 클라이언트 전용 — API 라우트 없음)
+**Project Type**: 웹 앱(단일 Next.js 프로젝트, `output: 'export'` 완전 정적 — API 라우트·서버 코드 없음)
 
 **Performance Goals**: 호스트 레이스 뷰 60fps, 폰 입력 → 호스트 반영 ≤ 0.5s(SC-002), 15명 동시 연결
 
-**Constraints**: 운영비 0원(FR-018) · 백엔드 금지 · 호스트 종료 시 방 소멸 수용 · iOS는 Vibration API 미지원 → 시각/사운드 폴백
+**Constraints**: 운영비 0원(FR-018) · 백엔드 금지 · 호스트 종료 시 방 소멸 수용 · iOS Vibration API 미지원 → 시각/사운드 폴백(FR-025에 명시) · PeerJS Cloud 공유 인프라 제약(ID 충돌 재발급·타임아웃 UX·15인 실기기 go/no-go 게이트 — research R1)
 
 **Scale/Scope**: 방당 최대 15명, 화면 4종(랜딩/호스트/참가/컨트롤러+결과), 미니게임 1종
 
@@ -65,17 +65,18 @@ app/
 ├── page.tsx                 # 랜딩 — "방 만들기" → /host
 ├── host/
 │   └── page.tsx             # 호스트: QR+로비 → 레이스 뷰 → 순위 (단일 페이지 상태 전환)
-└── play/[roomId]/
-    └── page.tsx             # 플레이어: 닉네임 → 컨트롤러 → 개인 결과
+└── play/
+    └── page.tsx             # 플레이어: /play?room={id} (useSearchParams) — 닉네임 → 컨트롤러 → 개인 결과
+                             #   컨트롤러에 온보딩 카피("좌우 번갈아 탭!") — 카운트다운 중 노출(SC-003)
 
 src/
 ├── game/
 │   ├── penguin.ts           # 판정 순수 로직(전진·기울기·넘어짐·드리프트) — UI 무의존
 │   └── balance.ts           # 밸런스 상수(전진량·회복량·페널티·드리프트·임계값·제한시간)
 ├── p2p/
-│   ├── protocol.ts          # 메시지 타입·버전 (contracts/p2p-protocol.md와 1:1)
-│   ├── host-room.ts         # 호스트: Peer 생성·roomId 발급·연결 수락·로스터·상태 수집
-│   └── player-client.ts     # 플레이어: 접속·재접속(playerId 승계)·상태 송신(10Hz)
+│   ├── protocol.ts          # 메시지 타입·버전·raceId/seq (contracts/p2p-protocol.md와 1:1)
+│   ├── host-room.ts         # 호스트: Peer 생성·ID충돌 재발급·연결 수락(control/state 2채널)·하트비트 감시·로스터·스냅샷
+│   └── player-client.ts     # 플레이어: 접속(10s 타임아웃)·재접속 백오프·하트비트·상태 송신(10Hz, unreliable)
 ├── stores/
 │   ├── host-store.ts        # zustand — 방 상태 머신(lobby→race→result)
 │   └── player-store.ts      # zustand — 플레이어 상태 머신

@@ -7,8 +7,9 @@
 
 | 필드 | 타입 | 규칙 |
 |---|---|---|
-| roomId | string | `mgf-` + 소문자·숫자 6자. PeerJS Peer ID 겸용 |
+| roomId | string | `mgf-` + 소문자·숫자 6자. PeerJS Peer ID 겸용. ID 충돌(`unavailable-id`) 시 재발급 |
 | phase | `'lobby' \| 'countdown' \| 'race' \| 'result'` | 상태 머신(아래) |
+| raceId | number | 판마다 1씩 증가(첫 판 1). 이전 판 지연 메시지 폐기 기준 |
 | players | Map<playerId, Player> | 최대 15 (FR-004) |
 | raceStartedAt | number \| null | 호스트 로컬 performance 기준 |
 
@@ -26,8 +27,8 @@ lobby ──(호스트 시작, 참가자≥2)──▶ countdown ──(3초)─
 
 | 필드 | 타입 | 규칙 |
 |---|---|---|
-| playerId | string(uuid) | 폰이 생성해 localStorage 보관. 재접속 승계 키 |
-| nickname | string | 1~10자, 공백만은 거부. 방 내 중복 시 " (2)" 접미사 |
+| playerId | string(uuid) | 폰이 생성해 localStorage 보관(닉네임도 함께 저장 — 재접속 폼 프리필). 재접속 승계 키 |
+| nickname | string | 입력 1~10자, 공백만은 거부. 방 내 중복 시 " (2)" 접미사 — 접미사는 10자 제한과 별도(표시 최대 14자) |
 | connected | boolean | DataConnection 생존 여부. 로비 표시용(FR-005) |
 | race | PlayerRaceState \| null | 레이스 중에만 존재 |
 
@@ -36,14 +37,17 @@ lobby ──(호스트 시작, 참가자≥2)──▶ countdown ──(3초)─
 | 필드 | 타입 | 규칙 |
 |---|---|---|
 | distance | number | 0 이상 단조 증가. 단위: 보(step) 환산 거리 |
-| tilt | number | -100 ~ +100. 절댓값 100 초과 순간 넘어짐(FR-011) |
+| tilt | number | 원시값(클램프하지 않음). `abs(tilt) >= TILT_LIMIT(100)` 되는 순간 넘어짐(FR-011). 게이지 표시만 ±100로 클램프 |
 | fallen | boolean | true가 되면 이후 입력 무시, 기록 확정 |
-| finishedAt | number \| null | 기록 확정 시각(레이스 시작 기준 경과 ms). 동점 타이브레이크(FR-021) |
-| lastSide | `'L' \| 'R' \| null` | 직전 입력 방향 |
-| lastTapAt | number \| null | 직전 입력 시각(드리프트·연타 무시 계산용) |
+| distanceReachedAt | number \| null | 현재 distance에 도달한 시각(레이스 시작 기준 경과 ms) = 마지막 전진 탭 시각. **동점 타이브레이크 값(FR-021)** — 호스트로 전송됨 |
+| finishedAt | number \| null | 기록 확정 시각(넘어짐 또는 30초 완주). 표기·연출용 |
+| seq | number | 판 내 스냅샷 단조 증가 번호. 수신 측 오래된 스냅샷 폐기용 |
+| lastSide | `'L' \| 'R' \| null` | 직전 입력 방향(로컬 전용, 미전송) |
+| lastTapAt | number \| null | 직전 입력 시각(드리프트·연타 무시 계산용, 로컬 전용) |
 
-**동점 규칙(FR-021)**: distance 동일 시 해당 distance에 도달한 시각이 빠른 쪽 상위.
-구현상 마지막 전진 탭 시각(넘어진 경우 finishedAt)을 비교값으로 쓴다.
+**동점 규칙(FR-021)**: distance 내림차순 → 동일하면 `distanceReachedAt` 오름차순
+(그 거리에 먼저 도달한 쪽 상위). 완주자도 마지막 전진 시각으로 비교되므로 30초
+완주끼리도 판별된다.
 
 ## RaceResult (기록)
 
