@@ -3,6 +3,7 @@
 // createPlayerClient가 PeerJS 배선(2채널·10Hz 송신·백오프)을 얹는다.
 
 import Peer, { type DataConnection } from "peerjs";
+import { logDebug } from "@/src/debug/metrics";
 import {
   BUFFERED_AMOUNT_LIMIT,
   CONNECT_TIMEOUT_MS,
@@ -390,6 +391,11 @@ export const createPlayerClient = (
         if (isStale()) return;
         const msg = parseMessage(raw);
         if (!msg) return;
+        if (msg.type === "heartbeat-ack") {
+          // 계측 모드: RTT/시계 오프셋 추정(SC-002)
+          const rtt = Date.now() - msg.t;
+          logDebug("clock", { rtt, offset: msg.hostT - (msg.t + rtt / 2) });
+        }
         if (msg.type === "join-rejected") {
           options.onRejected(msg.reason);
           destroy(); // 거부된 세션은 하트비트를 계속 보내지 않는다 — 재시도는 새 클라이언트로
@@ -435,6 +441,7 @@ export const createPlayerClient = (
       seq,
       ...latest,
     };
+    logDebug("state-send", { seq, distance: latest.distance });
     // state 채널 우선, 미개통 시 control 폴백 + bufferedAmount 가드(그 틱 스킵 = 합침)
     if (stateChannel?.open) {
       stateChannel.send(msg);
