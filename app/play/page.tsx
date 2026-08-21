@@ -3,8 +3,8 @@
 // 플레이어 셸 — /play?room={roomId} (정적 export 호환, research.md R2).
 // 화면 전환만 담당. 내용은 각 스토리 소유 컨테이너가 구현(F 이후 불변).
 
-import { Suspense, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PlayControllerContainer from "@/src/components/play/ControllerContainer";
 import PlayJoinContainer from "@/src/components/play/JoinContainer";
 import PersonalResultContainer from "@/src/components/play/PersonalResultContainer";
@@ -24,13 +24,7 @@ const PlayScreen = () => {
     if (status === "closed") client?.destroy();
   }, [status, client]);
 
-  if (!roomId) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-sky-950 p-8 text-center text-white">
-        <p>방 코드가 없어요. 호스트 화면의 QR을 다시 찍어주세요.</p>
-      </main>
-    );
-  }
+  if (!roomId) return <RoomCodeEntry />;
 
   if (status === "closed") return <RoomClosedNotice />;
 
@@ -56,6 +50,46 @@ const PlayScreen = () => {
         <PlayControllerContainer session={session} />
       )}
     </>
+  );
+};
+
+// QR을 못 찍는 경우의 수동 입장 경로 — 호스트 화면의 방 코드를 직접 입력 (R7)
+const RoomCodeEntry = () => {
+  const router = useRouter();
+  const [code, setCode] = useState("");
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = code.trim().toLowerCase();
+    if (!trimmed) return;
+    router.replace(`/play?room=${encodeURIComponent(trimmed)}`);
+  };
+
+  return (
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-sky-950 p-6 text-white">
+      <h1 className="text-2xl font-black">🐧 방 코드 입력</h1>
+      <p className="text-center text-sky-300">
+        QR을 못 찍겠다면 호스트 화면의 방 코드를 입력하세요
+      </p>
+      <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-4">
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="mgf-abc123"
+          autoCapitalize="off"
+          autoComplete="off"
+          enterKeyHint="go"
+          className="rounded-xl border-2 border-sky-700 bg-sky-900 px-4 py-3 text-center font-mono text-xl text-white placeholder:text-sky-500 focus:border-amber-400 focus:outline-none"
+        />
+        <button
+          type="submit"
+          className="rounded-xl bg-amber-400 py-4 text-xl font-black text-sky-950 active:scale-95"
+        >
+          입장
+        </button>
+      </form>
+    </main>
   );
 };
 
