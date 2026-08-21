@@ -1,19 +1,43 @@
 "use client";
 
-// US2 소유 — Phaser 레이스 뷰 마운트. 현재는 F가 만든 스텁.
+// US2 — 호스트 레이스 뷰: Phaser 게임 마운트/언마운트.
+// phaser는 여기서만 동적 import — 폰·초기 번들에 미포함(R6)
 
+import { useEffect, useRef } from "react";
 import type { THostRoomHandle } from "@/src/p2p/host-room";
 
 export interface THostRaceContainerProps {
   room: THostRoomHandle | null;
 }
 
-const HostRaceContainer = (_props: THostRaceContainerProps) => {
-  void _props; // 스텁 — 스토리 구현에서 사용
+const HostRaceContainer = ({ room }: THostRaceContainerProps) => {
+  const mountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!room || !mountRef.current) return;
+    const parent = mountRef.current;
+    let cancelled = false;
+    let handle: { destroy: () => void } | null = null;
+
+    void import("@/src/game-view/race-scene").then(({ buildRaceGame }) => {
+      if (cancelled) return;
+      handle = buildRaceGame(parent, {
+        getPositions: () => room.core.getRacePositions(),
+        getCountdownRemainingMs: () => room.core.countdownRemainingMs(),
+        getRaceRemainingMs: () => room.core.raceRemainingMs(),
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      handle?.destroy();
+    };
+  }, [room]);
+
   return (
-  <main className="flex min-h-dvh items-center justify-center bg-sky-950 text-white">
-    <p>레이스 (US2에서 구현)</p>
-  </main>
+    <main className="flex min-h-dvh items-center justify-center bg-sky-950">
+      <div ref={mountRef} className="h-dvh w-full" aria-label="레이스 트랙" />
+    </main>
   );
 };
 
