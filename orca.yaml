@@ -1,0 +1,11 @@
+scripts:
+  setup: |
+    set -euo pipefail
+    # 단일 Next.js 앱(레포 루트). 스캐폴딩 전이면 조용히 통과
+    if [ -f package.json ]; then
+      npm ci
+    fi
+    # gitignore 된 로컬 환경파일 승계
+    if [ -f "$ORCA_ROOT_PATH/.env.local" ]; then
+      cp "$ORCA_ROOT_PATH/.env.local" "$ORCA_WORKTREE_PATH/.env.local"
+    fi
