@@ -95,7 +95,7 @@ tests/
 
 **Structure Decision**: 단일 Next.js 프로젝트(레포 루트). 서버 코드가 없으므로
 frontend/backend 분리 불필요. 게임 규칙(`src/game/`)과 전송(`src/p2p/`)을 UI에서
-분리해 코덱스 테스트(역할 역전)가 순수 함수를 직접 검증할 수 있게 한다.
+분리해 독립 테스트 작성 에이전트(역할 역전, Opus 4.6)가 순수 함수를 직접 검증할 수 있게 한다.
 
 ## Complexity Tracking
 
