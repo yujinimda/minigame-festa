@@ -1,7 +1,8 @@
 # Data Model: 펭귄 빙판 걷기 (Phase 1)
 
 모든 상태는 휘발성 — 호스트 브라우저 메모리가 단일 진실. 영속 데이터는 플레이어
-폰 localStorage의 `playerId` 하나뿐(재접속 승계용, FR-026).
+폰 localStorage의 `{ playerId, nickname }` 뿐(playerId는 재접속 승계 키(FR-026),
+nickname은 재접속 폼 프리필용).
 
 ## Room (방) — 호스트 소유
 

@@ -25,7 +25,7 @@
 | type | 채널 | payload | 시점/규칙 |
 |---|---|---|---|
 | `join` | control | `{ playerId, nickname? }` | 연결 직후 1회. 재접속(호스트에 같은 playerId 존재)이면 `nickname` 생략 가능 — 호스트가 기존 값 복원. 신규인데 nickname이 없거나 유효하지 않으면 `join-rejected(invalid-nickname)` |
-| `heartbeat` | control | `{}` | 2초 간격. 호스트는 마지막 수신(모든 메시지 포함) 후 6초 무소식이면 `connected: false` 처리 — close 이벤트 단독 의존 금지(iOS Safari 이벤트 누락 대비) |
+| `heartbeat` | control | `{ t }` | 2초 간격, `t`는 플레이어 로컬 송신 시각. 호스트는 마지막 수신(모든 메시지 포함) 후 6초 무소식이면 `connected: false` 처리 — close 이벤트 단독 의존 금지(iOS Safari 이벤트 누락 대비) |
 | `state` | state | `{ raceId, seq, distance, tilt, fallen, distanceReachedAt }` | 레이스 중 10Hz. `seq`는 판 내 단조 증가. `distanceReachedAt`은 현재 distance에 도달한 시각(레이스 시작 기준 경과 ms) |
 | `fall` | control | `{ raceId, distance, distanceReachedAt, finishedAt }` | 넘어짐 순간 1회. 연출 트리거 + 기록 확정 |
 | `finish` | control | `{ raceId, distance, distanceReachedAt, finishedAt }` | 30초 로컬 타이머 종료 시 1회(생존 완주) |
@@ -40,6 +40,7 @@
 | `race-start` | control | `{ raceId, countdownMs, durationMs }` | 시작 브로드캐스트. 플레이어는 수신 시점 기준 로컬 타이머(R4) |
 | `race-end` | control | `{ raceId, results: [{playerId, nickname, distance, fallen, rank}] }` | 호스트 마감 후 브로드캐스트. 각 폰은 자기 rank 강조(FR-015) |
 | `return-lobby` | control | `{}` | "다시 하기"(FR-017). 폰은 대기 화면으로 |
+| `heartbeat-ack` | control | `{ t, hostT }` | `heartbeat` 수신 즉시 응답. `t`는 에코(플레이어가 RTT 계산), `hostT`는 호스트 시각(시계 오프셋 추정 = 계측 모드에서 SC-002 보정에 사용). **플레이어 측 호스트 생존 판정의 근거**: 마지막 호스트 수신 후 6초 무소식이면 재접속 백오프 시작, 20초까지 실패 지속 시 "방이 종료됨" 표시 |
 | `room-closed` | control | `{}` | 호스트 정상 종료 시(가능한 경우). 연결 끊김+하트비트 타임아웃만으로도 동일 처리 |
 
 ### RoomSnapshot (`joined.snapshot`)
@@ -66,11 +67,14 @@
 - **끊김 판정(FR-019)**: control close/error **또는** 하트비트 6초 타임아웃 중 먼저
   온 것. 레이스 중이면 마지막 수신 state의 `distance`/`distanceReachedAt`으로 기록
   확정, `fallen: false` 유지.
-- **호스트 소멸**: 플레이어는 close 또는 하트비트 응답 부재 시 "방이 종료됨" 표시.
+- **호스트 소멸**: 플레이어는 close 또는 `heartbeat-ack` 부재(6초) 시 재접속 백오프,
+  20초까지 실패가 지속되면 "방이 종료됨" 표시.
 
 ## 동점 판정 입력 (FR-021)
 
 호스트는 순위 집계 시 `distance` 내림차순 → 동일하면 `distanceReachedAt` 오름차순.
+`distanceReachedAt`이 `null`(전진 0회 — distance 0)이거나 그것까지 완전히 같으면
+**먼저 입장한(join 수락 순서) 쪽 상위**로 최종 유일화한다.
 `finishedAt`은 표기·연출용이지 타이브레이크 값이 아니다.
 
 ## 검증 시나리오 매핑
