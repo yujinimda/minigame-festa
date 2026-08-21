@@ -227,6 +227,14 @@ export interface TPlayerIdentity {
   nickname: string | null;
 }
 
+// crypto.randomUUID는 secure context 전용 — LAN http(실기기 개발 검증) 폴백 필수
+const generatePlayerId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 export const loadIdentity = (): TPlayerIdentity => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -234,7 +242,7 @@ export const loadIdentity = (): TPlayerIdentity => {
   } catch {
     // 프라이빗 모드 등 — 새 신원으로 진행
   }
-  const identity: TPlayerIdentity = { playerId: crypto.randomUUID(), nickname: null };
+  const identity: TPlayerIdentity = { playerId: generatePlayerId(), nickname: null };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(identity));
   } catch {
