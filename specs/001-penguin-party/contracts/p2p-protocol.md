@@ -49,7 +49,7 @@
 {
   phase: 'lobby' | 'countdown' | 'race' | 'result',
   raceId: number | null,
-  remainingMs: number | null,      // countdown/race일 때 남은 시간(호스트 기준)
+  remainingMs: number | null,      // countdown/race일 때 레이스 종료까지 전체 잔여 ms(카운트다운 잔여 포함, 호스트 기준) — 플레이어는 이 값으로 로컬 타이머를 역산한다
   roster: [{playerId, nickname, connected}],
   ownRecord: { distance, fallen, finishedAt } | null,   // 재접속자의 확정 기록(있으면)
   results: RaceResult[] | null     // phase가 result일 때
