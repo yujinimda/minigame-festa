@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import NicknameForm from "@/src/components/play/NicknameForm";
-import { MAX_PLAYERS, NICKNAME_MAX_LENGTH } from "@/src/game/balance";
+import { MAX_PLAYERS } from "@/src/game/balance";
 import { loadIdentity } from "@/src/p2p/player-client";
 
 export interface TPlayJoinContainerProps {
@@ -26,13 +26,8 @@ const PlayJoinContainer = ({
   connectFailed,
   onJoin,
 }: TPlayJoinContainerProps) => {
-  // 닉네임 값은 여기가 소유 — 재시도 버튼과 폼이 같은 현재 값을 쓴다
+  // 닉네임 값은 여기가 소유 — 재시도(connectFailed)와 폼이 같은 현재 값을 쓴다
   const [nickname, setNickname] = useState(() => loadIdentity().nickname ?? "");
-
-  const handleRetry = () => {
-    const value = nickname.trim();
-    if (value) onJoin(value.slice(0, NICKNAME_MAX_LENGTH));
-  };
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-sky-950 p-6 text-white">
@@ -45,18 +40,9 @@ const PlayJoinContainer = ({
         </p>
       )}
       {connectFailed && (
-        <div className="flex flex-col items-center gap-3">
-          <p role="alert" className="rounded-xl bg-rose-500/20 px-4 py-3 text-center font-semibold text-rose-200">
-            방에 연결하지 못했어요. 호스트와 같은 Wi-Fi면 더 잘 돼요.
-          </p>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="rounded-xl bg-sky-700 px-6 py-3 font-bold text-white active:scale-95"
-          >
-            다시 시도
-          </button>
-        </div>
+        <p role="alert" className="rounded-xl bg-rose-500/20 px-4 py-3 text-center font-semibold text-rose-200">
+          방에 연결하지 못했어요. 호스트와 같은 Wi-Fi면 더 잘 돼요.
+        </p>
       )}
 
       <NicknameForm
