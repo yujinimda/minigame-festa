@@ -49,6 +49,8 @@ export interface TPlayerCore {
   handleHostMsg(msg: THostMsg): void;
   tick(): void;
   reportFall(distance: number, distanceReachedAt: number | null): void;
+  // 판정 진행값 주입 — 30초 완주 finish가 마지막 실제 기록을 싣도록(0보 완주 버그 방지)
+  updateProgress(distance: number, distanceReachedAt: number | null): void;
   getStatus(): TPlayerStatus;
   getRaceId(): number | null;
   raceElapsed(): number | null; // 레이스(본게임) 시작 기준 경과 ms — countdown 중 음수
@@ -181,6 +183,12 @@ export const createPlayerCore = (options: TPlayerCoreOptions): TPlayerCore => {
         if (silent >= ROOM_CLOSED_TIMEOUT_MS) status = "closed";
         else if (silent >= HEARTBEAT_TIMEOUT_MS && status !== "reconnecting") status = "reconnecting";
       }
+    },
+
+    updateProgress(distance, distanceReachedAt) {
+      if (finishSent || fallSent) return;
+      lastDistance = distance;
+      lastDistanceReachedAt = distanceReachedAt;
     },
 
     reportFall(distance, distanceReachedAt) {
@@ -467,6 +475,7 @@ export const createPlayerClient = (
     core,
     pushState: (payload) => {
       latest = payload;
+      core.updateProgress(payload.distance, payload.distanceReachedAt);
     },
     reportFall: (payload) => {
       latest = payload;
