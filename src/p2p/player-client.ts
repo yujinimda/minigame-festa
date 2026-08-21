@@ -79,7 +79,10 @@ export const createPlayerCore = (options: TPlayerCoreOptions): TPlayerCore => {
   const markHostSeen = (): void => {
     lastHostSeenAt = now();
     if (status !== "reconnecting") return;
-    if (raceStartReceivedAt !== null && !finishSent && !fallSent) {
+    if (results !== null) {
+      // 순위가 이미 확정된 판 — result 화면 유지(reconnecting 복귀가 컨트롤러로 이탈하지 않게)
+      status = "result";
+    } else if (raceStartReceivedAt !== null && !finishSent && !fallSent) {
       const elapsed = now() - raceStartReceivedAt;
       status =
         elapsed < countdownMs
@@ -88,9 +91,7 @@ export const createPlayerCore = (options: TPlayerCoreOptions): TPlayerCore => {
             ? "racing"
             : "finished";
     } else if (finishSent || fallSent) {
-      status = results !== null ? "result" : "finished";
-    } else if (results !== null) {
-      status = "result";
+      status = "finished";
     } else {
       status = "joined";
     }
@@ -432,6 +433,9 @@ export const createPlayerClient = (
 
   const tickTimer = setInterval(() => {
     core.tick();
+    // 계약 §연결 수명: ack 부재 6초도 재접속 트리거 — close 이벤트가 누락되는
+    // 환경(iOS Safari)에서 status만 굳고 재시도가 없는 경로 방지
+    if (core.getStatus() === "reconnecting") scheduleReconnect();
     notifyIfChanged();
   }, 100);
 

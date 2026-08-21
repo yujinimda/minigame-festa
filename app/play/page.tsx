@@ -3,7 +3,7 @@
 // 플레이어 셸 — /play?room={roomId} (정적 export 호환, research.md R2).
 // 화면 전환만 담당. 내용은 각 스토리 소유 컨테이너가 구현(F 이후 불변).
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import PlayControllerContainer from "@/src/components/play/ControllerContainer";
 import PlayJoinContainer from "@/src/components/play/JoinContainer";
@@ -17,6 +17,12 @@ const PlayScreen = () => {
   const roomId = useSearchParams().get("room");
   const session = usePlayerSession();
   const { screen, status, rejectReason } = usePlayerStore();
+
+  // 방 종료가 확정되면 세션 타이머를 접는다(더 이상 재접속 대상이 없음)
+  const client = session.client;
+  useEffect(() => {
+    if (status === "closed") client?.destroy();
+  }, [status, client]);
 
   if (!roomId) {
     return (

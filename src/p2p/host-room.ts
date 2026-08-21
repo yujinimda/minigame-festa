@@ -71,6 +71,7 @@ export interface THostRoomCore {
   getResults(): TRaceResult[] | null;
   getSnapshotFor(playerId: string): TRoomSnapshot;
   hasPlayer(playerId: string): boolean;
+  countdownRemainingMs(): number | null;
   // Phaser 씬이 rAF에서 직접 폴링하는 경로 — React 리렌더 없이 위치 갱신(R6, 게이트8 B9)
   getRacePositions(): TRacePosition[];
   raceRemainingMs(): number | null;
@@ -337,6 +338,12 @@ export const createHostRoomCore = (
     getResults: () => results,
     getSnapshotFor: snapshotFor,
     hasPlayer: (playerId) => players.has(playerId),
+    // 호스트 UI용 phase 상대 잔여 — raceRemainingMs(전체 잔여)를 카운트다운 표시에
+    // 그대로 쓰면 32s가 나오는 오용 방지
+    countdownRemainingMs: () =>
+      phase === "countdown" && raceStartedAt !== null
+        ? Math.max(0, COUNTDOWN_MS - (now() - raceStartedAt))
+        : null,
     getRacePositions: () =>
       [...players.values()]
         .sort((a, b) => a.joinOrder - b.joinOrder)
@@ -378,6 +385,7 @@ export interface TCreateHostRoomOptions {
 // 호스트 브라우저에서만 호출. ID 충돌(unavailable-id) 시 새 코드로 자동 재발급.
 export const createHostRoom = (options: TCreateHostRoomOptions): THostRoomHandle => {
   const connections = new Map<string, DataConnection>(); // control 채널
+  const pendingCloses = new Set<ReturnType<typeof setTimeout>>(); // 거부 conn 지연 close
   let destroyed = false;
   let peer: Peer | null = null;
   let roomId = generateRoomId();
@@ -437,7 +445,11 @@ export const createHostRoom = (options: TCreateHostRoomOptions): THostRoomHandle
         // 거부된 참가자는 등록 해제 + 거부 메시지 flush 후 연결 정리
         if (!core.hasPlayer(playerId) && connections.get(playerId) === conn) {
           connections.delete(playerId);
-          setTimeout(() => conn.close(), 500);
+          const timer = setTimeout(() => {
+            pendingCloses.delete(timer);
+            conn.close();
+          }, 500);
+          pendingCloses.add(timer);
         }
       } else if (msg.type !== "heartbeat-ack") {
         core.handleMessage(playerId, msg as TPlayerMsg);
@@ -491,14 +503,21 @@ export const createHostRoom = (options: TCreateHostRoomOptions): THostRoomHandle
     getRoomId: () => roomId,
     core,
     destroy: () => {
+      if (destroyed) return;
       destroyed = true;
       clearInterval(ticker);
+      for (const timer of pendingCloses) clearTimeout(timer);
+      pendingCloses.clear();
       const closing: THostMsg = { v: PROTOCOL_VERSION, type: "room-closed" };
-      for (const conn of connections.values()) {
-        conn.send(closing);
-        conn.close();
-      }
-      peer?.destroy();
+      for (const conn of connections.values()) conn.send(closing);
+      // room-closed flush 여유 후 정리(거부 경로와 동일 기준). 어차피 플레이어는
+      // 하트비트 타임아웃만으로도 동일 처리된다(계약 §연결 수명)
+      const conns = [...connections.values()];
+      const finalPeer = peer;
+      setTimeout(() => {
+        for (const conn of conns) conn.close();
+        finalPeer?.destroy();
+      }, 300);
     },
   };
 };

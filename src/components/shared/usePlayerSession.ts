@@ -20,12 +20,14 @@ export interface TPlayerSession {
 
 export const usePlayerSession = (): TPlayerSession => {
   const clientRef = useRef<TPlayerClientHandle | null>(null);
+  const mountedRef = useRef(true);
   const [client, setClient] = useState<TPlayerClientHandle | null>(null);
 
   const join = useCallback(async (roomId: string, nickname: string) => {
     const store = usePlayerStore.getState();
     // 입장 제스처 = 오디오 언락 지점(FR-025). 실패 시 음소거 배지 표시
     const unlocked = await unlockAudio();
+    if (!mountedRef.current) return; // await 중 언마운트 — 회수 불가 클라이언트 생성 방지
     store.setMuted(!unlocked);
 
     const identity = loadIdentity();
@@ -54,13 +56,14 @@ export const usePlayerSession = (): TPlayerSession => {
   }, []);
 
   // 언마운트 시 세션 정리(게이트8 B4) — 없으면 유령 하트비트가 호스트 정원을 계속 점유한다
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       clientRef.current?.destroy();
       clientRef.current = null;
-    },
-    [],
-  );
+    };
+  }, []);
 
   return useMemo(() => ({ client, join }), [client, join]);
 };
