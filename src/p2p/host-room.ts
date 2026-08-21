@@ -284,7 +284,9 @@ export const createHostRoomCore = (
 
     startRace() {
       if (phase !== "lobby") return;
-      if (players.size < MIN_PLAYERS) return; // FR-006 권위 판정 — UI 비활성과 별개로 코어가 강제
+      // FR-006 권위 판정 — 등록 인원 기준. connected 기준은 T009 계약(하트비트 없는
+      // 시간 전진 시나리오)과 충돌해 되돌림 — 유령 방 방지는 UI 필터(LobbyContainer) 담당
+      if (players.size < MIN_PLAYERS) return;
       phase = "countdown";
       raceStartedAt = now();
       results = null;

@@ -49,6 +49,8 @@ export interface TPlayerCore {
   handleHostMsg(msg: THostMsg): void;
   tick(): void;
   reportFall(distance: number, distanceReachedAt: number | null): void;
+  // 판정 진행값 주입 — 30초 완주 finish가 마지막 실제 기록을 싣도록(0보 완주 버그 방지)
+  updateProgress(distance: number, distanceReachedAt: number | null): void;
   getStatus(): TPlayerStatus;
   getRaceId(): number | null;
   raceElapsed(): number | null; // 레이스(본게임) 시작 기준 경과 ms — countdown 중 음수
@@ -183,6 +185,12 @@ export const createPlayerCore = (options: TPlayerCoreOptions): TPlayerCore => {
       }
     },
 
+    updateProgress(distance, distanceReachedAt) {
+      if (finishSent || fallSent) return;
+      lastDistance = distance;
+      lastDistanceReachedAt = distanceReachedAt;
+    },
+
     reportFall(distance, distanceReachedAt) {
       if (fallSent || finishSent || raceId === null || raceStartReceivedAt === null) return;
       fallSent = true;
@@ -227,6 +235,14 @@ export interface TPlayerIdentity {
   nickname: string | null;
 }
 
+// crypto.randomUUID는 secure context 전용 — LAN http(실기기 개발 검증) 폴백 필수
+const generatePlayerId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 export const loadIdentity = (): TPlayerIdentity => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -234,7 +250,7 @@ export const loadIdentity = (): TPlayerIdentity => {
   } catch {
     // 프라이빗 모드 등 — 새 신원으로 진행
   }
-  const identity: TPlayerIdentity = { playerId: crypto.randomUUID(), nickname: null };
+  const identity: TPlayerIdentity = { playerId: generatePlayerId(), nickname: null };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(identity));
   } catch {
@@ -459,6 +475,7 @@ export const createPlayerClient = (
     core,
     pushState: (payload) => {
       latest = payload;
+      core.updateProgress(payload.distance, payload.distanceReachedAt);
     },
     reportFall: (payload) => {
       latest = payload;
