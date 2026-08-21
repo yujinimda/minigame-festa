@@ -15,7 +15,7 @@ PeerJS(WebRTC) 방을 열어 서버 역할을 하고, 플레이어 폰은 좌/�
 
 **Language/Version**: TypeScript 5.x (strict), Node.js 24 (빌드 환경)
 
-**Primary Dependencies**: Next.js 16(App Router) · React 19 · peerjs ^1.5 · phaser ^3(호스트 레이스 뷰 전용, dynamic import) · qrcode.react · zustand
+**Primary Dependencies**: Next.js 16(App Router) · React 19 · Tailwind CSS · peerjs ^1.5 · phaser ^3(호스트 레이스 뷰 전용, dynamic import) · qrcode.react · zustand
 
 **Storage**: 없음(방 상태는 호스트 브라우저 메모리, playerId만 폰 localStorage)
 
