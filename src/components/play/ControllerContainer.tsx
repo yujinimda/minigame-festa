@@ -39,6 +39,27 @@ const RaceRunner = ({
   const fallReportedRef = useRef(false);
   const [display, setDisplay] = useState({ distance: 0, tilt: 0, fallen: false });
   const [flash, setFlash] = useState(false);
+  const [startBanner, setStartBanner] = useState(false);
+
+  // 레이스 시작 피드백(FR-025, 게이트8 US2-B1): countdown→racing 전환 감지는
+  // 렌더 중 상태 보정 패턴으로(이펙트 내 동기 setState 금지)
+  const [prevRunStatus, setPrevRunStatus] = useState(status);
+  if (prevRunStatus !== status) {
+    setPrevRunStatus(status);
+    if (status === "racing") setStartBanner(true);
+  }
+
+  useEffect(() => {
+    if (status !== "racing") return;
+    playSfx("start");
+    vibrate(80); // iOS 미지원 시 startBanner가 시각 폴백
+  }, [status]);
+
+  useEffect(() => {
+    if (!startBanner) return;
+    const timer = setTimeout(() => setStartBanner(false), 1200);
+    return () => clearTimeout(timer);
+  }, [startBanner]);
 
   const raceNow = (): number => client?.core.raceElapsed() ?? 0;
 
@@ -112,6 +133,11 @@ const RaceRunner = ({
       {status === "countdown" && (
         <p className="rounded-2xl bg-amber-400/90 px-4 py-3 text-center text-xl font-black text-sky-950">
           왼발 오른발 번갈아 탭! 같은 발 두 번이면 미끄러져요 🧊
+        </p>
+      )}
+      {startBanner && (
+        <p className="rounded-2xl bg-emerald-400 px-4 py-3 text-center text-2xl font-black text-sky-950">
+          출발!! 🏃💨
         </p>
       )}
       {status === "reconnecting" && (

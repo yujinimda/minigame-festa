@@ -6,6 +6,12 @@
 import { useEffect, useRef } from "react";
 import type { THostRoomHandle } from "@/src/p2p/host-room";
 
+// Phaser 청크 프리페치 — 호스트 페이지 로드 시점에 받아두지 않으면 3초 카운트다운보다
+// 늦게 도착해 3·2·1을 건너뛸 수 있다(게이트8 US2 NOTE)
+if (typeof window !== "undefined") {
+  void import("@/src/game-view/race-scene");
+}
+
 export interface THostRaceContainerProps {
   room: THostRoomHandle | null;
 }

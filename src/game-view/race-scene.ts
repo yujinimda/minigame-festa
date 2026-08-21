@@ -17,7 +17,9 @@ const W = 1280;
 const H = 720;
 const TRACK_LEFT = 200;
 const TRACK_RIGHT = W - 120;
-const MIN_GOAL = 40; // 러버밴드 최소 스케일(보)
+// 러버밴드 최소 스케일(보) — 30초 × 평균 2탭/초 ≈ 60보를 기준으로, 초반(선두 40보
+// 이하)에도 트랙이 텅 비어 보이지 않는 하한. 뷰 전용 상수라 balance.ts 밖(플레이테스트 조정 대상)
+const MIN_GOAL = 40;
 
 interface TLaneSprite {
   penguin: Phaser.GameObjects.Text;
@@ -33,6 +35,7 @@ class RaceScene extends Phaser.Scene {
   private countdownText!: Phaser.GameObjects.Text;
   private timerText!: Phaser.GameObjects.Text;
   private startAnnounced = false;
+  private lastCountdownSecond = -1;
 
   constructor(source: TRaceSceneSource) {
     super("race");
@@ -140,7 +143,12 @@ class RaceScene extends Phaser.Scene {
     // 카운트다운 / 잔여 시간
     const countdown = this.source.getCountdownRemainingMs();
     if (countdown !== null && countdown > 0) {
-      this.countdownText.setText(String(Math.ceil(countdown / 1000)));
+      const second = Math.ceil(countdown / 1000);
+      if (second !== this.lastCountdownSecond) {
+        this.lastCountdownSecond = second;
+        playSfx("countdown"); // FR-024 카운트다운 효과음(3·2·1)
+      }
+      this.countdownText.setText(String(second));
       this.timerText.setText("");
     } else {
       if (!this.startAnnounced) {
