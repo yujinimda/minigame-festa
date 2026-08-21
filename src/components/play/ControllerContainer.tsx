@@ -41,22 +41,20 @@ const RaceRunner = ({
   const [flash, setFlash] = useState(false);
   const [startBanner, setStartBanner] = useState(false);
 
-  // 레이스 시작 피드백(FR-025, 게이트8 US2-B1): countdown→racing 전환 감지는
-  // 렌더 중 상태 보정 패턴으로(이펙트 내 동기 setState 금지)
+  // 레이스 시작 피드백(FR-025, 게이트8 US2-B1): **countdown→racing 전환에서만** 발화 —
+  // reconnecting→racing 복귀나 레이스 중 재합류에 "출발!!"이 재발화하지 않게(2회차 NOTE).
+  // 전환 감지는 렌더 중 상태 보정 패턴(이펙트 내 동기 setState 금지)
   const [prevRunStatus, setPrevRunStatus] = useState(status);
   if (prevRunStatus !== status) {
     setPrevRunStatus(status);
-    if (status === "racing") setStartBanner(true);
+    if (status === "racing" && prevRunStatus === "countdown") setStartBanner(true);
   }
 
-  useEffect(() => {
-    if (status !== "racing") return;
-    playSfx("start");
-    vibrate(80); // iOS 미지원 시 startBanner가 시각 폴백
-  }, [status]);
-
+  // 사운드·진동은 배너 발화에 종속 — 전환 1회당 1회, StrictMode 마운트 경로 중복 없음
   useEffect(() => {
     if (!startBanner) return;
+    playSfx("start");
+    vibrate(80); // iOS 미지원 시 배너가 시각 폴백
     const timer = setTimeout(() => setStartBanner(false), 1200);
     return () => clearTimeout(timer);
   }, [startBanner]);
@@ -169,12 +167,18 @@ const PlayControllerContainer = ({ session }: TPlayControllerContainerProps) => 
   const status = usePlayerStore((s) => s.status);
   const nickname = usePlayerStore((s) => s.nickname);
 
-  // 레이스 세대: countdown 진입마다 증가 → RaceRunner 리마운트로 판정 상태 초기화
+  // 레이스 세대: 새 판 진입마다 증가 → RaceRunner 리마운트로 판정 상태 초기화.
+  // countdown 진입 외에, 대기 상태에서 곧장 racing으로 합류하는 재접속(다음 판이
+  // 이미 진행 중)도 새 판이다 — 이전 판 stateRef 승계 방지(2회차 NOTE).
+  // reconnecting→racing 복귀는 같은 판이므로 리마운트하지 않는다
   const [raceGen, setRaceGen] = useState(0);
   const [prevStatus, setPrevStatus] = useState(status);
   if (prevStatus !== status) {
     setPrevStatus(status);
-    if (status === "countdown") setRaceGen((g) => g + 1);
+    const freshEntry = prevStatus === "idle" || prevStatus === "joined";
+    if (status === "countdown" || (status === "racing" && freshEntry)) {
+      setRaceGen((g) => g + 1);
+    }
   }
 
   return (

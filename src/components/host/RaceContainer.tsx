@@ -9,7 +9,9 @@ import type { THostRoomHandle } from "@/src/p2p/host-room";
 // Phaser 청크 프리페치 — 호스트 페이지 로드 시점에 받아두지 않으면 3초 카운트다운보다
 // 늦게 도착해 3·2·1을 건너뛸 수 있다(게이트8 US2 NOTE)
 if (typeof window !== "undefined") {
-  void import("@/src/game-view/race-scene");
+  import("@/src/game-view/race-scene").catch(() => {
+    // 프리페치 실패는 무시 — 마운트 시점의 동적 import가 다시 시도한다
+  });
 }
 
 export interface THostRaceContainerProps {
