@@ -29,8 +29,10 @@ import { usePlayerStore } from "@/src/stores/player-store";
 import HostLobbyContainer from "@/src/components/host/LobbyContainer";
 import PlayJoinContainer from "@/src/components/play/JoinContainer";
 
-// FR-006 "2명 이상" — balance.ts에 대응 상수가 없어 스펙에서 직접 가져온 하한값.
-const MIN_PLAYERS_TO_START = 2;
+// FR-006 시작 최소 인원 — 2026-08-21 스펙 변경(2→1, 혼자 연습 주행 허용)에 맞춰
+// balance.ts의 MIN_PLAYERS를 단일 출처로 사용한다.
+import { MIN_PLAYERS } from "@/src/game/balance";
+const MIN_PLAYERS_TO_START = MIN_PLAYERS;
 
 const ROOM_CODE = "abc234";
 const ROOM_ID = `mgf-${ROOM_CODE}`;
@@ -275,16 +277,22 @@ describe("LobbyContainer — 참가자 목록 (FR-005)", () => {
   });
 });
 
-describe("LobbyContainer — 시작 버튼 (FR-006)", () => {
-  it(`참가자가 ${MIN_PLAYERS_TO_START}명 미만이면 시작 버튼이 비활성이다`, () => {
-    renderLobby([entry("지니")]);
+describe("LobbyContainer — 시작 버튼 (FR-006, 2026-08-21 개정: 1명 이상)", () => {
+  it(`참가자가 ${MIN_PLAYERS_TO_START}명 미만(0명)이면 시작 버튼이 비활성이다`, () => {
+    renderLobby([]);
+
+    expect(startButton()).toBeDisabled();
+  });
+
+  it("연결이 끊긴 참가자만 있으면 시작 버튼이 비활성이다 (유령 방 방지)", () => {
+    renderLobby([entry("지니", false)]);
 
     expect(startButton()).toBeDisabled();
   });
 
   it(`참가자가 ${MIN_PLAYERS_TO_START}명 이상이면 시작 버튼이 활성이고 클릭 시 startRace를 한 번 호출한다`, async () => {
     const user = userEvent.setup();
-    const { startRace } = renderLobby([entry("지니"), entry("펭수")]);
+    const { startRace } = renderLobby([entry("지니")]);
 
     expect(startButton()).toBeEnabled();
     await user.click(startButton());
