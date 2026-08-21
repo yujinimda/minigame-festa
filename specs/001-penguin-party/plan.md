@@ -15,7 +15,7 @@ PeerJS(WebRTC) 방을 열어 서버 역할을 하고, 플레이어 폰은 좌/�
 
 **Language/Version**: TypeScript 5.x (strict), Node.js 24 (빌드 환경)
 
-**Primary Dependencies**: Next.js 16(App Router) · React 19 · peerjs ^1.5 · qrcode.react · zustand
+**Primary Dependencies**: Next.js 16(App Router) · React 19 · peerjs ^1.5 · phaser ^3(호스트 레이스 뷰 전용, dynamic import) · qrcode.react · zustand
 
 **Storage**: 없음(방 상태는 호스트 브라우저 메모리, playerId만 폰 localStorage)
 
@@ -82,8 +82,10 @@ src/
 │   └── player-store.ts      # zustand — 플레이어 상태 머신
 ├── audio/
 │   └── sound.ts             # 오디오 언락·BGM·효과음·진동(폴백 포함)
+├── game-view/
+│   └── race-scene.ts        # Phaser 3 씬 — 트랙 15레인·펭귄 스프라이트·넘어짐 트윈/파티클·쉐이크 (호스트 전용)
 └── components/
-    ├── host/                # QrPanel, LobbyList, RaceTrack, PenguinSprite, RankingBoard
+    ├── host/                # QrPanel, LobbyList, RaceContainer(Phaser 마운트), RankingBoard
     └── play/                # NicknameForm, Controller(좌/우 버튼), TiltGauge, PersonalResult
 
 tests/

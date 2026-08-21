@@ -18,7 +18,7 @@
 |---|---|
 | **F (Foundation 워크트리)** | 프로젝트 설정 전부, `src/game/*`, `src/p2p/*`, `src/stores/*`, `src/audio/*`, `app/layout.tsx`, `app/page.tsx`, `app/host/page.tsx`·`app/play/page.tsx`(phase 스위치 셸 + 컨테이너 스텁), `src/components/shared/*` |
 | **US1 워크트리** | `src/components/host/LobbyContainer.tsx`, `QrPanel.tsx`, `LobbyList.tsx`, `src/components/play/JoinContainer.tsx`, `NicknameForm.tsx` |
-| **US2 워크트리** | `src/components/host/RaceContainer.tsx`, `RaceTrack.tsx`, `PenguinSprite.tsx`, `src/components/play/ControllerContainer.tsx`, `Controller.tsx`, `TiltGauge.tsx` |
+| **US2 워크트리** | `src/components/host/RaceContainer.tsx`, `src/game-view/race-scene.ts`, `src/components/play/ControllerContainer.tsx`, `Controller.tsx`, `TiltGauge.tsx` |
 | **US3 워크트리** | `src/components/host/ResultContainer.tsx`, `RankingBoard.tsx`, `src/components/play/PersonalResultContainer.tsx` |
 | **테스트(codex)** | `tests/**` — 스토리별 하위 폴더로 분리(`tests/unit/game/`는 F, `tests/unit/roster/`는 US1, …) |
 
@@ -32,7 +32,7 @@
 - [ ] T001 Next.js 16 프로젝트 스캐폴드(TypeScript strict, App Router, Tailwind) + `next.config.ts`에 `output: 'export'` 설정, 레포 루트
 - [ ] T002 [P] Vitest 설정 `vitest.config.ts` + `npm run test` 스크립트
 - [ ] T003 [P] Playwright 설정 `playwright.config.ts`(desktop+mobile 프로젝트, dev 서버 자동 기동) + `npm run e2e` 스크립트
-- [ ] T004 [P] 의존성 추가: peerjs, qrcode.react, zustand — `package.json`
+- [ ] T004 [P] 의존성 추가: peerjs, phaser, qrcode.react, zustand — `package.json`
 
 ## Phase 2: Foundational (Blocking Prerequisites) — F 워크트리
 
@@ -73,7 +73,7 @@
 
 - [ ] T020 (codex) [US2] 레이스 흐름 통합 테스트 `tests/unit/race/race-flow.test.ts` — FR-006·007·012·019: race-start 브로드캐스트→로컬 타이머, 끊김 시 마지막 state로 확정, 이전 raceId 스냅샷 폐기, race-end 집계
 - [ ] T021 [P] [US2] 컨트롤러 `src/components/play/ControllerContainer.tsx` + `Controller.tsx`(좌/우 대형 버튼, 온보딩 카피 "좌우 번갈아 탭!" 카운트다운 중 노출, 탭 피드백 진동/플래시) + `TiltGauge.tsx`(±100 클램프 표시)
-- [ ] T022 [P] [US2] 레이스 뷰 `src/components/host/RaceContainer.tsx` + `RaceTrack.tsx`(가로 트랙 15레인, rAF에서 ref 기반 CSS transform — React 리렌더 없이) + `PenguinSprite.tsx`(기울기 반영, 넘어짐 미끄러지는 연출)
+- [ ] T022 [P] [US2] 레이스 뷰 `src/components/host/RaceContainer.tsx`(next/dynamic ssr:false로 Phaser 마운트/언마운트) + `src/game-view/race-scene.ts`(Phaser 3 씬 — 가로 트랙 15레인, 스냅샷 ref 구독 렌더, 기울기 반영 스프라이트, 넘어짐 미끄러짐 트윈+파티클+카메라 쉐이크)
 - [ ] T023 [US2] 레이스 배선: 카운트다운·rAF 게임 루프(applyTap/applyDrift)·10Hz 송신·호스트 수집→트랙 갱신·이중 마감(로컬 30s + 호스트 마감)·사운드 이벤트, T020 통과 확인
 
 **Checkpoint**: US1+US2 = 플레이 가능한 게임 — 머지 2순위

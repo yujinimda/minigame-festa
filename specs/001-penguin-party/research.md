@@ -86,14 +86,20 @@
 ## R6. 상태 관리·게임 루프
 
 - **Decision**: zustand로 화면 상태 머신(lobby→race→result)과 로스터를 관리.
-  고빈도 값(기울기·거리)은 React 상태를 거치지 않고 ref + rAF로 직접 DOM/CSS
-  transform 갱신(리렌더 폭풍 방지). 판정 로직은 `src/game/penguin.ts` 순수 함수
-  (`applyTap(state, side, now)`, `applyDrift(state, dt)`)로 두고 어느 쪽에서도 재사용.
-- **Rationale**: 15개 펭귄 × 10Hz 갱신을 React 리렌더로 처리하면 60fps가 흔들릴
-  수 있다. 순수 함수 분리는 워크플로우의 역할 역전 테스트(코덱스 작성)가 UI 없이
-  규칙을 검증하는 전제 조건.
-- **Alternatives considered**: Jotai(회사 컨벤션이지만 개인 프로젝트 소규모 상태에
-  zustand가 더 단순), PixiJS/canvas(15 스프라이트는 DOM transform으로 충분 — YAGNI).
+  **호스트 레이스 뷰는 Phaser 3 캔버스**(씬 1개 — 트랙·펭귄 스프라이트·넘어짐
+  트윈·파티클·카메라 쉐이크)로 렌더하고, 폰 컨트롤러·로비·순위 등 나머지 UI는
+  전부 React DOM. Phaser는 호스트 페이지에서만 `next/dynamic`(ssr: false)으로
+  지연 로드(정적 export 호환, 폰 번들에 미포함). React↔Phaser 경계: 호스트가
+  수신한 최신 스냅샷을 모듈 레벨 저장소(ref)에 두고 Phaser 씬의 update 루프가
+  읽어간다 — React 리렌더 없이 60fps. 판정 로직은 `src/game/penguin.ts` 순수
+  함수(`applyTap`, `applyDrift`)로 두고 어느 쪽에서도 재사용.
+- **Rationale**: 넘어짐·미끄러짐 같은 연출이 이 게임의 핵심 재미(design.md)인데
+  트윈·파티클·쉐이크를 CSS로 손수 만드는 것보다 Phaser 내장 기능이 품질·속도
+  모두 우위(2026-08-21 사용자 결정). 15개 펭귄 × 10Hz 갱신도 캔버스가 여유.
+  번들 증가(~1MB)는 데스크톱 호스트 페이지만 부담.
+- **Alternatives considered**: DOM + CSS transform(당초 계획 — 연출 품질에서 열세),
+  PixiJS(렌더러뿐이라 트윈/파티클을 별도 조립 — 이 규모엔 Phaser가 더 단순),
+  Three.js(3D — 과함, 기각), Jotai(소규모 상태에 zustand가 더 단순).
 
 ## R7. QR 코드
 
